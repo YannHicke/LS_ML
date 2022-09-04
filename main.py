@@ -1,3 +1,6 @@
+from cgitb import handler
+from decimal import DivisionByZero
+from tkinter import W
 import numpy as np
 
 ### a function to create a unique increasing ID
@@ -89,19 +92,16 @@ class BackproppableArray(object):
         for i in range(len(all_my_dependencies)):
             if all_my_dependencies[i].grad == None:
                 all_my_dependencies[i].grad = np.zeros(all_my_dependencies[i].data.shape)
-        all_my_dependencies[0].grad = 1
+                all_my_dependencies[0].grad = 1
 
-        # print(all_my_dependencies)
+        #print(all_my_dependencies)
         self.grad_fn()
 
         
 
-        for i in range(1,len(all_my_dependencies)):
-            all_my_dependencies[i].grad_fn()
-            print("my name is ", all_my_dependencies[i])
-            # print("current grad", all_my_dependencies[i].grad)
-            # print("x grad", all_my_dependencies[len(all_my_dependencies) -1].grad)
-
+        if(len(all_my_dependencies) > 1): 
+            for i in range(1,len(all_my_dependencies)):
+                all_my_dependencies[i].grad_fn()
         
 
 
@@ -135,8 +135,6 @@ class BackproppableArray(object):
     def __rtruediv__(self, other):
         return BA_Div(to_ba(other), self)
 
-    
-
     # TODO (2.2) Add operator overloading for matrix multiplication
     def __matmul__(self, other):
         return BA_MatMul(self, to_ba(other))
@@ -167,7 +165,7 @@ class BA_Add(BackproppableArray):
 
     def grad_fn(self):
         # TODO: (2.3) improve grad fn for Add
-        # print("add")
+        #print("add")
         # print(self)
         # print(self.x)
         # print(self.y)
@@ -191,9 +189,13 @@ class BA_Sub(BackproppableArray):
 
     def grad_fn(self):
         # TODO: (1.3, 2.3) implement grad fn for Sub
-
+        # print('sub')
+        # print("selfgrad: " + str(self.grad))
+        # print("xgrad: " + str(self.x.grad))
+        # print("ygrad: " + str(self.y.grad))
+        # print("ydata: " + str(self.y.data))
         self.x.grad += np.sum(self.grad)
-        self.y.grad -= self.grad
+        self.y.grad -= np.sum(self.grad)
 
 # a class for an array that's the result of a multiplication operation
 class BA_Mul(BackproppableArray):
@@ -207,12 +209,12 @@ class BA_Mul(BackproppableArray):
         # TODO: (1.3, 2.3) implement grad fn for Mul
         # print("mul")
         # print(self)
-        # print(self.x)
-        # print(self.y)
+        # print(self.x.data)
+        # print(self.y.data)
         # print("xgrad: " + str(self.x.grad))
         # print("ygrad: " + str(self.y.grad))
         # print("grad: " + str(self.grad))
-        self.x.grad += self.y.data * self.grad #careful here, not finished. What about scalar * vector?
+        self.x.grad += self.y.data * self.grad
         self.y.grad += self.x.data * self.grad
 
 # a class for an array that's the result of a division operation
@@ -237,13 +239,12 @@ class BA_MatMul(BackproppableArray):
         assert(len(x.data.shape) == 2)
         assert(len(y.data.shape) == 2)
         super().__init__(x.data @ y.data, [x,y])
-        print("x", x)
         self.x = x
         self.y = y
 
     def grad_fn(self):
         # TODO: (2.1) implement grad fn for MatMul
-        # print("matmul")
+        #print("matmul")
         # print(self.grad)
         # print(self.y.data.T)
         self.x.grad += self.grad @ self.y.data.T
@@ -259,9 +260,6 @@ class BA_Exp(BackproppableArray):
 
     def grad_fn(self):
         # TODO: (1.3) implement grad fn for Exp
-
-        # \\\\\\\\\\\\\ /////////////////
-
         self.x.grad += np.exp(self.x.data) * self.grad 
 
 def exp(x):
@@ -279,7 +277,9 @@ class BA_Log(BackproppableArray):
 
     def grad_fn(self):
         # TODO: (1.3) implement grad fn for Log
-        self.x.grad += self.grad/self.x.data
+        #self.x.grad += self.grad/ self.x.data
+        self.x.grad += self.grad/ self.x.data
+
 
 def log(x):
     if isinstance(x, BackproppableArray):
@@ -302,7 +302,7 @@ class BA_Sum(BackproppableArray):
         # TODO: (2.1) implement grad fn for Sum
         # print("sum")
         # print(self.grad.shape)
-        print("BA_sum", self.x.grad.shape)
+        # print(self.x.grad.shape)
         self.x.grad += self.grad
 
 # a class for an array that's the result of a reshape operation
@@ -353,8 +353,7 @@ def backprop_diff(f, x):
     ba_x = to_ba(x)
     # print("ba_x: " + str(ba_x))
     fx = f(ba_x)
-    print("fax: " + str(fx))
-    print("fx: " + str(f(x)))
+    # print("fx: " + str(fx))
     fx.backward()
     return ba_x.grad
 
@@ -405,8 +404,8 @@ class TestFxs(object):
     @staticmethod
     def g1(x):
         a = np.ones(3,dtype="float64")
-        ax = x + a   # what happens if you switch to a + x instead of x + a
-        return (ax * ax).sum().reshape(())
+        ax = x + a
+        return (ax*ax).sum().reshape(())
 
     @staticmethod
     def g2(x):
@@ -415,16 +414,6 @@ class TestFxs(object):
         ax = x - a
         bx = log((x + b)*(x + b)).reshape((4,5)).transpose()
         y = bx @ ax
-        return y.sum().reshape(())
-
-    @staticmethod
-    def g3(x):
-        a = np.ones((4,5),dtype="float64")
-        b = np.ones((5,4),dtype="float64")
-        ax = x + a
-        # bx = log((x + b)*(x + b)).reshape((4,5)).transpose()
-        y = ax @ b
-        print("y", y)
         return y.sum().reshape(())
 
     # vector-to-scalar tests
@@ -455,8 +444,29 @@ if __name__ == "__main__":
     # print("numerical diff " + str(numerical_diff(TestFxs.g1, 1)))
     # print("Backprop Diff " + str(backprop_diff(TestFxs.g1, 1)) + "\n")
 
-    print("numerical diff " + str(numerical_diff(TestFxs.g2, 1)))
-    print("Backprop Diff " + str(backprop_diff(TestFxs.g2, 1)) + "\n")
+    # print("numerical diff " + str(numerical_diff(TestFxs.g2, -9)))
+    # print("Backprop Diff " + str(backprop_diff(TestFxs.g2, -9)) + "\n")
+
+    for _ in range(100):
+        num1 = np.random.randint(-100, 100)
+        w = np.round(numerical_diff(TestFxs.g1, num1),2)
+        z = np.round(backprop_diff(TestFxs.g1, num1),2)
+        assert w == z
+
+        num2= np.random.randint(1, 100)
+        x = np.round(numerical_diff(TestFxs.g2, num2),2)
+        y = np.round(backprop_diff(TestFxs.g2, num2),2)
+        assert x == y
+
+    a = np.round(numerical_grad(TestFxs.h1, np.zeros(5)),2)
+    b = np.round(backprop_diff(TestFxs.h1, np.zeros(5)),2)
+    print(a)
+    print(b)
+
+
+
+    
+
 
     
 
