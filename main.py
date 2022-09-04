@@ -92,16 +92,17 @@ class BackproppableArray(object):
         for i in range(len(all_my_dependencies)):
             if all_my_dependencies[i].grad == None:
                 all_my_dependencies[i].grad = np.zeros(all_my_dependencies[i].data.shape)
-                all_my_dependencies[0].grad = 1
+        all_my_dependencies[0].grad = 1
 
         #print(all_my_dependencies)
         self.grad_fn()
 
-        
-
-        if(len(all_my_dependencies) > 1): 
-            for i in range(1,len(all_my_dependencies)):
-                all_my_dependencies[i].grad_fn()
+    
+        for i in range(1,len(all_my_dependencies)):
+            all_my_dependencies[i].grad_fn()
+            #print("my name is ", all_my_dependencies[i])
+            # print("current grad", all_my_dependencies[i].grad)
+            # print("x grad", all_my_dependencies[len(all_my_dependencies) -1].grad)
         
 
 
@@ -214,7 +215,7 @@ class BA_Mul(BackproppableArray):
         # print("xgrad: " + str(self.x.grad))
         # print("ygrad: " + str(self.y.grad))
         # print("grad: " + str(self.grad))
-        self.x.grad += self.y.data * self.grad
+        self.x.grad += self.y.data * self.grad #careful here, not finished. What about scalar * vector?
         self.y.grad += self.x.data * self.grad
 
 # a class for an array that's the result of a division operation
@@ -416,6 +417,16 @@ class TestFxs(object):
         y = bx @ ax
         return y.sum().reshape(())
 
+    @staticmethod
+    def g3(x):
+        a = np.ones((4,5),dtype="float64")
+        b = np.ones((5,4),dtype="float64")
+        ax = x + a
+        # bx = log((x + b)*(x + b)).reshape((4,5)).transpose()
+        y = ax @ b
+        print("y", y)
+        return y.sum().reshape(())
+
     # vector-to-scalar tests
     @staticmethod
     def h1(x):  # takes an input of shape (5,)
@@ -458,10 +469,10 @@ if __name__ == "__main__":
         y = np.round(backprop_diff(TestFxs.g2, num2),2)
         assert x == y
 
-    a = np.round(numerical_grad(TestFxs.h1, np.zeros(5)),2)
-    b = np.round(backprop_diff(TestFxs.h1, np.zeros(5)),2)
-    print(a)
-    print(b)
+    # a = np.round(numerical_grad(TestFxs.h1, np.zeros(5)),2)
+    # b = np.round(backprop_diff(TestFxs.h1, np.zeros(5)),2)
+    # print(a)
+    # print(b)
 
 
 
